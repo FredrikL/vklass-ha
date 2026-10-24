@@ -1,0 +1,12 @@
+{
+  "domain": "vklass",
+  "name": "Vklass",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/OWNER/vklass-ha",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/OWNER/vklass-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

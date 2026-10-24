@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Vklass",
+        "description": "Use the guardian username and password for Vklass (BankID is not supported). If you have none, use \"Glömt inloggningsuppgifter?\" on auth.vklass.se.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Vklass login expired",
+        "description": "Enter the new password for {username}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password",
+      "cannot_connect": "Could not reach Vklass",
+      "unknown": "Unexpected response from Vklass"
+    },
+    "abort": {
+      "already_configured": "This Vklass account is already configured",
+      "reauth_successful": "Password updated"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_school_day": {
+        "name": "Next school day"
+      },
+      "upcoming_assignments": {
+        "name": "Upcoming tests and homework"
+      },
+      "lunch": {
+        "name": "Lunch"
+      }
+    }
+  }
+}

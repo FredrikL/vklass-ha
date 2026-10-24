@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vklass"
+version = "0.1.0"
+description = "Async client for the Vklass guardian web UI (school schedule)"
+requires-python = ">=3.9"
+dependencies = ["aiohttp>=3.9"]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-aiohttp"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
