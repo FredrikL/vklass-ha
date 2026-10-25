@@ -11,6 +11,7 @@ from .schedule import (
     AssignmentType,
     SchoolDay,
     next_school_day,
+    schedule_ahead,
     upcoming_assignments,
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     "AssignmentType",
     "SchoolDay",
     "next_school_day",
+    "schedule_ahead",
     "upcoming_assignments",
     "Child",
     "Event",

@@ -39,7 +39,9 @@ Each child becomes a device with three sensors:
 
 - `sensor.<child>_next_school_day` - state is when the next school day starts (a
   timestamp, handy for alarms). Attributes: `date`, `lesson_count`, `last_end`,
-  `lessons[]` (start, end, title, code, location, cancelled) and a printable `summary`.
+  `lessons[]` (start, end, start_at, end_at, title, code, location, cancelled) and a
+  printable `summary`. `schedule[]` holds the same per-day data for today (if it has
+  lessons) followed by the next school day, so a card can hide lessons that have ended.
   "Next" means the next day with lessons, so Friday shows Monday and a school break shows
   the first day back.
 - `sensor.<child>_upcoming_tests_and_homework` - state is the number of items in the next
@@ -50,7 +52,8 @@ Each child becomes a device with three sensors:
   school has not published a menu that far (Vklass lists only about today + four
   weekdays). Attributes: `date`, `dishes[]` and `upcoming[]` (every published day).
 
-Data refreshes hourly. A child added in Vklass later appears after reloading the
+Data is fetched every 12 hours; the next school day and the assignment countdown are
+recomputed at midnight, so they stay correct in between. A child added in Vklass later appears after reloading the
 integration. If the password changes, Home Assistant asks you to re-enter it.
 
 ### Dashboard example

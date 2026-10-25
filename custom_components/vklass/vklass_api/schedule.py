@@ -56,6 +56,9 @@ class SchoolDay:
             {
                 "start": e.start.strftime("%H:%M"),
                 "end": e.end.strftime("%H:%M") if e.end else None,
+                # Full timestamps so a template can tell what has already passed.
+                "start_at": e.start.isoformat(),
+                "end_at": e.end.isoformat() if e.end else None,
                 "title": e.title,
                 "code": e.code,
                 "location": e.location,
@@ -87,6 +90,18 @@ def next_school_day(events: list[Event], today: date) -> Optional[SchoolDay]:
         return None
     day = min(by_day)
     return SchoolDay(day, sorted(by_day[day], key=lambda e: e.start))
+
+
+def schedule_ahead(events: list[Event], today: date) -> list[SchoolDay]:
+    """Today (if it has lessons) followed by the next school day."""
+    days = []
+    todays = [e for e in events if e.kind is EventKind.LESSON and e.start.date() == today]
+    if todays:
+        days.append(SchoolDay(today, sorted(todays, key=lambda e: e.start)))
+    following = next_school_day(events, today)
+    if following:
+        days.append(following)
+    return days
 
 
 @dataclass(frozen=True)

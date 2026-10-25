@@ -8,6 +8,7 @@ from vklass.schedule import (
     AssignmentType,
     classify_assignment,
     next_school_day,
+    schedule_ahead,
     upcoming_assignments,
 )
 
@@ -73,6 +74,26 @@ def test_next_school_day_ignores_today_and_past():
     assert next_school_day(events, today).lessons[0].title == "Tomorrow"
 
 
+def test_schedule_ahead_is_today_then_next_school_day():
+    events = [
+        ev(L, "Later", "2026-11-02T10:00"),
+        ev(L, "Earlier", "2026-11-02T08:00"),
+        ev(L, "Tomorrow", "2026-11-03T08:00"),
+        ev(L, "Day after", "2026-11-04T08:00"),
+        ev(A, "Prov", "2026-11-02T12:00"),
+    ]
+    days = schedule_ahead(events, date(2026, 11, 2))
+    assert [d.date for d in days] == [date(2026, 11, 2), date(2026, 11, 3)]
+    assert [e.title for e in days[0].lessons] == ["Earlier", "Later"]
+
+
+def test_schedule_ahead_without_lessons_today():
+    events = [ev(L, "Monday", "2026-11-02T08:00")]
+    days = schedule_ahead(events, date(2026, 11, 1))
+    assert [d.date for d in days] == [date(2026, 11, 2)]
+    assert schedule_ahead([], date(2026, 11, 1)) == []
+
+
 def test_next_school_day_keeps_cancelled_lessons():
     events = [ev(L, "Svenska", "2026-11-03T08:00", cancelled=True)]
     assert next_school_day(events, date(2026, 11, 2)).lessons[0].cancelled
@@ -109,8 +130,9 @@ def test_school_day_as_dict():
     assert d["lesson_count"] == 2
     assert d["last_end"] == "2026-11-02T10:00:00+01:00"
     assert d["lessons"][0] == {
-        "start": "08:15", "end": "09:00", "title": "Idrott",
-        "code": "", "location": "", "cancelled": False,
+        "start": "08:15", "end": "09:00",
+        "start_at": "2026-11-02T08:15:00+01:00", "end_at": "2026-11-02T09:00:00+01:00",
+        "title": "Idrott", "code": "", "location": "", "cancelled": False,
     }
     assert d["summary"] == "08:15-09:00 Idrott\n09:15-10:00 Svenska [INSTÄLLD]"
 

@@ -16,6 +16,7 @@ from .const import ASSIGNMENT_DAYS, DOMAIN, LOOKAHEAD_DAYS, UPDATE_INTERVAL
 from .vklass_api import (
     Assignment,
     Child,
+    Event,
     LunchDay,
     SchoolDay,
     VklassAuthError,
@@ -23,6 +24,7 @@ from .vklass_api import (
     VklassError,
     VklassParseError,
     next_school_day,
+    schedule_ahead,
     upcoming_assignments,
 )
 
@@ -31,11 +33,30 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ChildData:
+    """Raw events from the last fetch; views are derived for the current date.
+
+    Fetches are twelve hours apart, so computing "today" at read time keeps the
+    next school day and the assignment countdown correct across midnight.
+    """
+
     child: Child
-    next_day: Optional[SchoolDay]
-    assignments: list[Assignment]
+    events: list[Event]
     # Days the school has published a menu for (about today + 4 weekdays).
     lunches: list[LunchDay]
+
+    @property
+    def next_day(self) -> Optional[SchoolDay]:
+        return next_school_day(self.events, dt_util.now().date())
+
+    @property
+    def schedule(self) -> list[SchoolDay]:
+        return schedule_ahead(self.events, dt_util.now().date())
+
+    @property
+    def assignments(self) -> list[Assignment]:
+        return upcoming_assignments(
+            self.events, dt_util.now().date(), days=ASSIGNMENT_DAYS
+        )
 
 
 class VklassCoordinator(DataUpdateCoordinator[dict[int, ChildData]]):
@@ -65,10 +86,7 @@ class VklassCoordinator(DataUpdateCoordinator[dict[int, ChildData]]):
                 )
                 data[child.id] = ChildData(
                     child=child,
-                    next_day=next_school_day(events, today),
-                    assignments=upcoming_assignments(
-                        events, today, days=ASSIGNMENT_DAYS
-                    ),
+                    events=events,
                     lunches=lunches.get(child.id, []),
                 )
             return data

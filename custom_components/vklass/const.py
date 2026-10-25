@@ -4,8 +4,10 @@ from datetime import timedelta
 
 DOMAIN = "vklass"
 
-# Be gentle with an unofficial scrape: hourly is plenty for a school schedule.
-UPDATE_INTERVAL = timedelta(hours=1)
+# Be gentle with an unofficial scrape: schedules rarely change, so twice a day is
+# plenty. Sensors recompute "today"/"next day" from the fetched events, so they do
+# not go stale between fetches.
+UPDATE_INTERVAL = timedelta(hours=12)
 # How far ahead to fetch; must cover a school break so "next school day" resolves.
 LOOKAHEAD_DAYS = 21
 # Tests and homework are listed this many days ahead.

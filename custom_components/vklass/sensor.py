@@ -6,9 +6,10 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import VklassConfigEntry
@@ -48,6 +49,19 @@ class _VklassChildSensor(CoordinatorEntity[VklassCoordinator], SensorEntity):
             manufacturer="Vklass",
         )
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Between fetches the date still rolls over, so refresh the derived state.
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass, self._midnight, hour=0, minute=0, second=5
+            )
+        )
+
+    @callback
+    def _midnight(self, _now: datetime) -> None:
+        self.async_write_ha_state()
+
     @property
     def _child(self) -> ChildData | None:
         return self.coordinator.data.get(self._child_id)
@@ -72,7 +86,10 @@ class NextSchoolDaySensor(_VklassChildSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         day = self._child.next_day
-        return day.as_dict() if day else {}
+        attrs = day.as_dict() if day else {}
+        # Today's lessons (if any) then the next school day; a card filters on end_at.
+        attrs["schedule"] = [d.as_dict() for d in self._child.schedule]
+        return attrs
 
 
 class UpcomingAssignmentsSensor(_VklassChildSensor):
