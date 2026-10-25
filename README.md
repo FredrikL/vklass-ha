@@ -56,16 +56,42 @@ Data is fetched every 12 hours; the next school day and the assignment countdown
 recomputed at midnight, so they stay correct in between. A child added in Vklass later appears after reloading the
 integration. If the password changes, Home Assistant asks you to re-enter it.
 
-### Dashboard example
+### Dashboard examples
 
 Replace `alva` with your child's name as it appears in the entity ids.
+
+Upcoming lessons: today's lessons that have not ended yet, then the next school day. The
+card uses `now()`, so it re-renders every minute and a lesson drops off when it ends.
+
+```yaml
+type: markdown
+title: Schema
+content: |
+  {% set names = ['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'] %}
+  {% set days = state_attr('sensor.alva_next_school_day', 'schedule') or [] %}
+  {% set ns = namespace(shown=false) %}
+  {% for d in days %}
+  {% set r = namespace(rest=[]) %}
+  {% for l in d.lessons %}
+  {% if as_datetime(l.end_at or l.start_at) > now() %}{% set r.rest = r.rest + [l] %}{% endif %}
+  {% endfor %}
+  {% if r.rest %}{% set ns.shown = true %}
+  **{{ 'Idag' if d.date == now().date().isoformat() else names[as_datetime(d.date).weekday()] ~ ' ' ~ as_datetime(d.date).day ~ '/' ~ as_datetime(d.date).month }}**
+
+  {% for l in r.rest %}
+  - {{ l.start }}–{{ l.end or '?' }} {{ l.title }}{{ ' (' ~ l.location ~ ')' if l.location }}{{ ' [INSTÄLLD]' if l.cancelled }}
+  {% endfor %}
+
+  {% endif %}
+  {% endfor %}
+  {% if not ns.shown %}Inga kommande lektioner.{% endif %}
+```
+
+Lunch, tests and homework:
 
 ```yaml
 type: markdown
 content: >
-  **{{ state_attr('sensor.alva_next_school_day', 'date') }}**
-  {{ state_attr('sensor.alva_next_school_day', 'summary') }}
-
   Lunch: {{ states('sensor.alva_lunch') }}
 
   {% for i in state_attr('sensor.alva_upcoming_tests_and_homework', 'items') %}
