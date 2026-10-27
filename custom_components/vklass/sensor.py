@@ -11,6 +11,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import VklassConfigEntry
 from .const import ASSIGNMENT_DAYS, DOMAIN
@@ -116,20 +117,22 @@ class UpcomingAssignmentsSensor(_VklassChildSensor):
 
 
 class LunchSensor(_VklassChildSensor):
-    """Lunch on the next school day (the same date as the next-school-day sensor).
+    """The next published lunch menu, from today onward.
 
-    Vklass only lists a few days ahead, so this is unknown when the school has not
-    published a menu that far; `upcoming` always lists every published day.
+    Vklass only lists a few days ahead, and menus can exist for days without
+    lessons (or be missing for the next school day), so this is not tied to the
+    schedule; `upcoming` lists every published day.
     """
 
     _key = "lunch"
     _attr_translation_key = "lunch"
 
     def _next_day_lunch(self):
-        day = self._child.next_day
-        if day is None:
-            return None
-        return next((l for l in self._child.lunches if l.date == day.date), None)
+        today = dt_util.now().date()
+        return next(
+            (l for l in sorted(self._child.lunches, key=lambda l: l.date) if l.date >= today),
+            None,
+        )
 
     @property
     def native_value(self) -> str | None:

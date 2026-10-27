@@ -48,9 +48,8 @@ Each child becomes a device with three sensors:
   14 days. Attributes: `items[]` (title, type, due, date, days_until), `tests[]` and
   `next_test`. The type is `test`, `homework`, `submission` or `other`, guessed from the
   title (`Prov...`, `Läxa...`, `Inlämning...`).
-- `sensor.<child>_lunch` - state is the lunch on the next school day, or unknown if the
-  school has not published a menu that far (Vklass lists only about today + four
-  weekdays). Attributes: `date`, `dishes[]` and `upcoming[]` (every published day).
+- `sensor.<child>_lunch` - state is the next published lunch menu from today onward, or unknown
+  if there is none (Vklass lists only about today + four weekdays). Attributes: `date`, `dishes[]` and `upcoming[]` (every published day).
 
 Data is fetched every 12 hours; the next school day and the assignment countdown are
 recomputed at midnight, so they stay correct in between. A child added in Vklass later appears after reloading the
