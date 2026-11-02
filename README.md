@@ -17,12 +17,17 @@ when Vklass changes the feed (see `docs/api-notes.md`).
 
 ## Get the calendar link
 
-1. In Vklass, open the schedule page (Kalender -> Schema).
-2. Open the menu with the calendar icon, **Prenumerera på schema**.
-3. Copy the link for the child (the copy button, or right-click the link). It looks like
-   `webcal://cal.vklass.se/<id>.ics?includeLectures=true`.
+1. Log in to Vklass in a browser and open the schedule page (`Calendar/Schedule`).
+2. Open the floating menu button (three dots) on that page and choose **Prenumerera på schema**.
+3. The dialog lists one link per child. Use the copy button, or right-click the link and
+   copy its address. It looks like `webcal://cal.vklass.se/<id>.ics?includeLectures=true`.
 
-Treat the link like a password: anyone who has it can read that child's schedule.
+Paste it as it is: `webcal://` and `https://` links both work, and the setup form always
+asks Vklass for lessons as well as tests and homework (`includeLectures=true`). Only
+`cal.vklass.se` links are accepted.
+
+Treat the link like a password: anyone who has it can read that child's schedule. Home
+Assistant stores it in the config entry, so it is also in your backups.
 
 ## Install
 
@@ -34,7 +39,9 @@ Treat the link like a password: anyone who has it can read that child's schedule
 2. Restart Home Assistant.
 3. Settings -> Devices & services -> Add integration -> **Vklass**. Enter the child's
    name and calendar link, and optionally the school's skolmaten.se link (for example
-   `https://skolmaten.se/yourschool`). **Add the integration once per child.**
+   `https://skolmaten.se/yourschool`, or the RSS link behind it). **Add the integration
+   once per child.** Setup fetches the calendar (and the menu) once and tells you if the
+   link is wrong.
 
 ### HACS (custom repository)
 
@@ -61,24 +68,37 @@ Each child becomes a device with up to three sensors:
   published lunch menu from today onward, or unknown if there is none. Attributes:
   `date`, `dishes[]` and `upcoming[]` (every published day).
 
-Data is fetched every 12 hours; the next school day and the assignment countdown are
-recomputed at midnight, so they stay correct in between.
+The calendar and the menu are fetched every 12 hours; the next school day and the
+assignment countdown are recomputed at midnight, so they stay correct in between.
+
+Each child has their own entry, so siblings at the same school each need the lunch link
+if you want a lunch sensor for both. The lunch sensor is created when the entry is set
+up. To add or change a lunch link later, remove the entry and add it again.
 
 ### Limits of the calendar feed
 
 - It covers about a month ahead.
-- **Cancelled lessons are not marked**, because the feed has no such flag. `cancelled` is
-  always false for now.
+- **Cancelled lessons are not marked**, because the feed has no such flag, so `cancelled`
+  stays false. (If Vklass starts sending the standard `STATUS:CANCELLED`, it is picked up.)
 - Tests and homework appear as all-day entries; their due time is read from the entry's
   description when there is one.
 - Lunch is not part of the feed, so it comes from Skolmaten instead (school-wide, not
-  per child).
+  per child). If Skolmaten is unreachable the last menu is kept and the schedule is
+  unaffected; days in the past drop out of the sensor by date.
+- There is no per-lesson cancelled or substitute information, and no school-wide
+  holidays; a school break simply has no lessons.
 
-### If the link stops working
+### If something stops working
 
-If Vklass stops recognising the link (for example it was regenerated), Home Assistant
-shows a re-authentication prompt (Settings -> Devices & services -> Vklass -> Reconfigure).
-Paste the new link from "Prenumerera på schema".
+- **Vklass no longer recognises the link** (it was regenerated, or mistyped): Home
+  Assistant shows a re-authentication prompt (Settings -> Devices & services -> Vklass ->
+  Reconfigure). Paste the new link from "Prenumerera på schema".
+- **The sensors turn unavailable and the log says the request was refused or "possibly
+  bot protection"**: Vklass is blocking the request. This is retried at the next 12 hour
+  update. If it persists, open an issue; it may mean the feed has been put behind the
+  same protection as the login.
+- **A wrong link is rejected during setup** with "Vklass does not recognise this
+  calendar link"; an empty answer from Vklass means exactly that.
 
 ### Upgrading from 0.1
 
@@ -110,7 +130,7 @@ content: |
   **{{ 'Idag' if d.date == now().date().isoformat() else names[as_datetime(d.date).weekday()] ~ ' ' ~ as_datetime(d.date).day ~ '/' ~ as_datetime(d.date).month }}**
 
   {% for l in r.rest %}
-  - {{ l.start }}–{{ l.end or '?' }} {{ l.title }}{{ ' (' ~ l.location ~ ')' if l.location }}{{ ' [INSTÄLLD]' if l.cancelled }}
+  - {{ l.start }}–{{ l.end or '?' }} {{ l.title }}{{ ' (' ~ l.location ~ ')' if l.location }}
   {% endfor %}
 
   {% endif %}
@@ -118,14 +138,20 @@ content: |
   {% if not ns.shown %}Inga kommande lektioner.{% endif %}
 ```
 
-Lunch (if configured), tests and homework:
+Lunch (needs the skolmaten.se link), tests and homework. Lunch uses the `dishes`
+attribute, since the sensor state is cut off at 255 characters:
 
 ```yaml
 type: markdown
 content: >
-  Lunch: {{ states('sensor.alva_lunch') }}
+  {% set dishes = state_attr('sensor.alva_lunch', 'dishes') or [] %}
+  {% if dishes %}**Lunch {{ state_attr('sensor.alva_lunch', 'date') }}**
 
-  {% for i in state_attr('sensor.alva_upcoming_tests_and_homework', 'items') %}
+  {% for d in dishes %}
+  - {{ d }}
+  {% endfor %}{% endif %}
+
+  {% for i in state_attr('sensor.alva_upcoming_tests_and_homework', 'items') or [] %}
   - {{ i.date }} ({{ i.type }}): {{ i.title }}
   {% endfor %}
 ```
