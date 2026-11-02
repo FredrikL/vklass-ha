@@ -3,50 +3,59 @@ from pathlib import Path
 
 import pytest
 
-from vklass import VklassParseError
-from vklass.parsing import _resolve_day_dates, parse_lunches
+from vklass import LunchDay, VklassInvalidUrl, VklassParseError, normalize_lunch_url
+from vklass.lunch import parse_lunches
 
-HTML = (Path(__file__).parent / "fixtures" / "welcome.html").read_text(encoding="utf-8")
-
-
-def test_parse_lunches_names_and_days():
-    cards = parse_lunches(HTML, date(2026, 10, 22))
-    assert [name for name, _ in cards] == ["Alva", "Bo"]
-    alva = dict((l.date, l.dishes) for l in cards[0][1])
-    assert list(alva) == [date(2026, 10, 22), date(2026, 10, 23), date(2026, 10, 27)]
-    assert alva[date(2026, 10, 22)] == ["Köttbullar med potatis", "Vegetariskt: Linsgryta"]
-    assert alva[date(2026, 10, 27)] == ["Pannkakor & sylt"]  # entity decoded
+XML = (Path(__file__).parent / "fixtures" / "lunch.xml").read_text(encoding="utf-8")
 
 
-def test_days_without_menu_are_dropped():
-    cards = parse_lunches(HTML, date(2026, 10, 22))
-    assert date(2026, 10, 26) not in {l.date for l in cards[0][1]}  # empty monday
-    assert [l.date for l in cards[1][1]] == [date(2026, 10, 22)]
+def test_days_and_dishes():
+    assert parse_lunches(XML) == [
+        LunchDay(
+            date(2026, 11, 2),
+            [
+                "Korv stroganoff serveras med ris (Bird)",
+                "Vegetarisk korv stroganoff serveras med ris (Vegetarian)",
+            ],
+        ),
+        LunchDay(date(2026, 11, 3), ["Spaghetti med färssås (Vegetarian)"]),
+    ]  # Wednesday has no dishes, so it is left out
 
 
-def test_no_cards_is_a_parse_error():
+def test_not_rss():
     with pytest.raises(VklassParseError):
-        parse_lunches("<html>login page</html>", date(2026, 10, 22))
+        parse_lunches("<html>nope</html>")
+    with pytest.raises(VklassParseError):
+        parse_lunches("not xml at all")
 
 
-def test_weekday_labels_resolve_in_order():
-    friday = date(2026, 10, 23)
-    labels = ["idag", "måndag", "tisdag", "onsdag", "torsdag"]
-    assert _resolve_day_dates(labels, friday) == [
-        date(2026, 10, 23), date(2026, 10, 26), date(2026, 10, 27),
-        date(2026, 10, 28), date(2026, 10, 29),
-    ]
+EXPECTED = "https://skolmaten.se/api/4/rss/week/exampleskolan?locale=sv"
 
 
-def test_same_weekday_as_today_means_next_week():
-    thursday = date(2026, 10, 22)
-    assert _resolve_day_dates(["idag", "torsdag"], thursday) == [
-        thursday, date(2026, 10, 29),
-    ]
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "https://skolmaten.se/exampleskolan",
+        "https://skolmaten.se/exampleskolan/",
+        "https://www.skolmaten.se/exampleskolan",
+        "https://skolmaten.se/api/4/rss/week/exampleskolan?locale=en",
+    ],
+)
+def test_normalize_lunch_url(pasted):
+    assert normalize_lunch_url(pasted) == EXPECTED
 
 
-def test_imorgon_and_unknown_labels():
-    today = date(2026, 10, 22)
-    assert _resolve_day_dates(["idag", "imorgon", "okänd", "måndag"], today) == [
-        today, date(2026, 10, 23), None, date(2026, 10, 26),
-    ]
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "https://example.com/exampleskolan",
+        "https://skolmaten.se.evil.example.com/exampleskolan",
+        "https://skolmaten.se/",
+        "https://skolmaten.se/a/b/c",
+        "ftp://skolmaten.se/exampleskolan",
+    ],
+)
+def test_normalize_lunch_url_rejects(bad):
+    with pytest.raises(VklassInvalidUrl):
+        normalize_lunch_url(bad)

@@ -10,7 +10,9 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class Child:
-    id: int
+    # Chosen by the caller (Home Assistant uses the config entry id); it must not
+    # contain the secret calendar URL, since it ends up in entity unique ids.
+    id: str
     name: str
 
 
@@ -27,25 +29,17 @@ class EventKind(enum.Enum):
     OTHER = "other"
 
 
-# eventType values observed in /Events/FullCalendar responses.
-EVENT_KINDS = {
-    1: EventKind.LESSON,
-    2: EventKind.ASSIGNMENT,
-    8: EventKind.HOLIDAY,
-}
-
-
 @dataclass(frozen=True)
 class Event:
-    # Vklass gives lessons no stable id, so this is derived from child+start+title.
+    # The calendar feed's own event id, prefixed with the child id.
     uid: str
-    child_id: int
+    child_id: str
     kind: EventKind
     title: str
     # Short code such as "SV" or "IDH"; empty for non-lessons.
     code: str
     start: datetime
-    # None for assignments (due at `start`).
+    # None for assignments (due at `start`, taken from the description when given).
     end: Optional[datetime]
     all_day: bool
     location: str

@@ -18,7 +18,7 @@ TZ = ZoneInfo("Europe/Stockholm")
 def ev(kind, title, start, end=None, cancelled=False):
     return Event(
         uid=f"{title}{start}",
-        child_id=1,
+        child_id="1",
         kind=kind,
         title=title,
         code="",

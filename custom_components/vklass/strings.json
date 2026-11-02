@@ -2,29 +2,38 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Vklass",
-        "description": "Use the guardian username and password for Vklass (BankID is not supported). If you have none, use \"Glömt inloggningsuppgifter?\" on auth.vklass.se.",
+        "title": "Add a child's Vklass schedule",
+        "description": "In Vklass, open the schedule page, choose \"Prenumerera på schema\" and copy the link for the child. Paste it below. Repeat \"Add integration\" for each child.\n\nThe lunch link is optional: the school's page on skolmaten.se, for example `https://skolmaten.se/yourschool`.",
         "data": {
-          "username": "Username",
-          "password": "Password"
+          "name": "Child's name",
+          "url": "Vklass calendar link",
+          "lunch_url": "Skolmaten lunch link (optional)"
+        },
+        "data_description": {
+          "url": "The link looks like https://cal.vklass.se/….ics (webcal:// links work too). Anyone with the link can see the schedule, so keep it private.",
+          "lunch_url": "Leave empty to skip lunch."
         }
       },
       "reauth_confirm": {
-        "title": "Vklass login expired",
-        "description": "Enter the new password for {username}.",
+        "title": "Vklass calendar link no longer works",
+        "description": "Vklass no longer recognises the calendar link for {name}. Copy a new link from \"Prenumerera på schema\" in Vklass.",
         "data": {
-          "password": "Password"
+          "url": "Vklass calendar link"
         }
       }
     },
     "error": {
-      "invalid_auth": "Invalid username or password",
-      "cannot_connect": "Could not reach Vklass",
+      "invalid_url": "This is not a Vklass calendar link. It should start with https://cal.vklass.se/ or webcal://cal.vklass.se/",
+      "invalid_lunch_url": "This is not a skolmaten.se link, for example https://skolmaten.se/yourschool",
+      "name_required": "Enter the child's name",
+      "unknown_link": "Vklass does not recognise this calendar link",
+      "cannot_connect": "Could not read the calendar from Vklass",
+      "lunch_unavailable": "Could not read a lunch menu from Skolmaten for this school",
       "unknown": "Unexpected response from Vklass"
     },
     "abort": {
-      "already_configured": "This Vklass account is already configured",
-      "reauth_successful": "Password updated"
+      "already_configured": "This calendar link is already added",
+      "reauth_successful": "Calendar link updated"
     }
   },
   "entity": {
