@@ -12,7 +12,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import ASSIGNMENT_DAYS, DOMAIN, LOOKAHEAD_DAYS, UPDATE_INTERVAL
+from .const import ASSIGNMENT_DAYS, DOMAIN, UPDATE_INTERVAL
 from .vklass_api import (
     Assignment,
     Child,
@@ -22,7 +22,6 @@ from .vklass_api import (
     VklassAuthError,
     VklassClient,
     VklassError,
-    VklassParseError,
     next_school_day,
     schedule_ahead,
     upcoming_assignments,
@@ -41,7 +40,7 @@ class ChildData:
 
     child: Child
     events: list[Event]
-    # Days the school has published a menu for (about today + 4 weekdays).
+    # Days the school has published a menu for (empty without a lunch link).
     lunches: list[LunchDay]
 
     @property
@@ -59,46 +58,49 @@ class ChildData:
         )
 
 
-class VklassCoordinator(DataUpdateCoordinator[dict[int, ChildData]]):
-    """Fetches every child's schedule and derives what the sensors show."""
+class VklassCoordinator(DataUpdateCoordinator[ChildData]):
+    """Fetches one child's calendar feed (and the school menu, if configured)."""
+
+    config_entry: ConfigEntry
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, client: VklassClient
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        client: VklassClient,
+        child: Child,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
-            name=DOMAIN,
+            name=f"{DOMAIN} {child.name}",
             config_entry=entry,
             update_interval=UPDATE_INTERVAL,
         )
         self.client = client
+        self.child = child
+        self._lunches: list[LunchDay] = []
 
-    async def _async_update_data(self) -> dict[int, ChildData]:
-        today = dt_util.now().date()
+    async def _async_update_data(self) -> ChildData:
         try:
-            children = await self.client.get_children()
-            lunches = await self._get_lunches(children, today)
-            data = {}
-            for child in children:
-                events = await self.client.get_upcoming_events(
-                    child, days=LOOKAHEAD_DAYS, today=today
-                )
-                data[child.id] = ChildData(
-                    child=child,
-                    events=events,
-                    lunches=lunches.get(child.id, []),
-                )
-            return data
+            events = await self.client.get_events(self.child)
         except VklassAuthError as err:
+            # The calendar link was revoked or is wrong: ask for a new one.
             raise ConfigEntryAuthFailed(str(err)) from err
         except VklassError as err:
             raise UpdateFailed(str(err)) from err
+        return ChildData(self.child, events, await self._get_lunches())
 
-    async def _get_lunches(self, children, today):
-        """Lunch is a nice-to-have scraped from HTML; never fail the schedule on it."""
+    async def _get_lunches(self) -> list[LunchDay]:
+        """Lunch is a nice-to-have; never fail the schedule on it.
+
+        If Skolmaten is down, the last menu stays, and stale days drop out by date.
+        """
         try:
-            return await self.client.get_lunches(children, today)
-        except VklassParseError as err:
-            _LOGGER.warning("Could not read lunch menu from Vklass: %s", err)
-            return {}
+            self._lunches = await self.client.get_lunches()
+        except VklassError as err:
+            _LOGGER.warning("Could not read the lunch menu: %s", err)
+        return self._lunches
+
+
+VklassConfigEntry = ConfigEntry[VklassCoordinator]

@@ -1,4 +1,4 @@
-"""Sensors: next school day and upcoming tests/homework, per child."""
+"""Sensors: next school day, upcoming tests/homework and lunch, for one child."""
 
 from __future__ import annotations
 
@@ -13,9 +13,8 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from . import VklassConfigEntry
 from .const import ASSIGNMENT_DAYS, DOMAIN
-from .coordinator import ChildData, VklassCoordinator
+from .coordinator import ChildData, VklassConfigEntry, VklassCoordinator
 from .vklass_api import AssignmentType
 
 
@@ -25,28 +24,22 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data
-    # Children added to Vklass later are picked up on the next reload.
-    async_add_entities(
-        sensor(coordinator, entry.entry_id, child_id)
-        for child_id in coordinator.data
-        for sensor in (NextSchoolDaySensor, UpcomingAssignmentsSensor, LunchSensor)
-    )
+    sensors = [NextSchoolDaySensor, UpcomingAssignmentsSensor]
+    if coordinator.client.has_lunch:
+        sensors.append(LunchSensor)
+    async_add_entities(sensor(coordinator, entry.entry_id) for sensor in sensors)
 
 
 class _VklassChildSensor(CoordinatorEntity[VklassCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _key: str
 
-    def __init__(
-        self, coordinator: VklassCoordinator, entry_id: str, child_id: int
-    ) -> None:
+    def __init__(self, coordinator: VklassCoordinator, entry_id: str) -> None:
         super().__init__(coordinator)
-        self._child_id = child_id
-        child = coordinator.data[child_id].child
-        self._attr_unique_id = f"{entry_id}_{child_id}_{self._key}"
+        self._attr_unique_id = f"{entry_id}_{self._key}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_{child_id}")},
-            name=child.name,
+            identifiers={(DOMAIN, entry_id)},
+            name=coordinator.child.name,
             manufacturer="Vklass",
         )
 
@@ -64,12 +57,8 @@ class _VklassChildSensor(CoordinatorEntity[VklassCoordinator], SensorEntity):
         self.async_write_ha_state()
 
     @property
-    def _child(self) -> ChildData | None:
-        return self.coordinator.data.get(self._child_id)
-
-    @property
-    def available(self) -> bool:
-        return super().available and self._child is not None
+    def _child(self) -> ChildData:
+        return self.coordinator.data
 
 
 class NextSchoolDaySensor(_VklassChildSensor):

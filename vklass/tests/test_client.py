@@ -1,4 +1,3 @@
-from datetime import date
 from pathlib import Path
 
 import aiohttp
@@ -10,186 +9,114 @@ from vklass import (
     VklassAuthError,
     VklassClient,
     VklassConnectionError,
+    VklassError,
     VklassParseError,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
-ALVA = Child(1001, "Alva")
+KID = Child("kid", "Alva")
 
 
-class FakeVklass:
-    """Stands in for both auth.vklass.se (/auth) and custodian.vklass.se (/c)."""
+class Fake:
+    """Stands in for cal.vklass.se (/feed) and skolmaten.se (/lunch)."""
 
     def __init__(self):
-        self.logins = 0
-        self.valid_sessions = set()
-        self.calendar_posts = []
-        self.calendar_body = (FIXTURES / "calendar.json").read_text(encoding="utf-8")
+        self.feed = (FIXTURES / "feed.ics").read_text(encoding="utf-8")
+        self.feed_status = 200
+        self.lunch = (FIXTURES / "lunch.xml").read_text(encoding="utf-8")
+        self.lunch_status = 200
+        self.requests = []
 
     def app(self):
         app = web.Application()
-        app.router.add_get("/auth/credentials", self.credentials)
-        app.router.add_post("/auth/credentials/signin", self.signin)
-        app.router.add_get("/auth/process", self.process)
-        app.router.add_get("/c/landing", self.landing)
-        app.router.add_get("/c/Calendar/Schedule/", self.schedule)
-        app.router.add_get("/c/Home/Welcome", self.welcome)
-        app.router.add_post("/c/Events/FullCalendar", self.calendar)
+        app.router.add_get("/feed", self.serve_feed)
+        app.router.add_get("/lunch", self.serve_lunch)
         return app
 
-    async def credentials(self, request):
-        return web.Response(text=(FIXTURES / "login.html").read_text())
-
-    async def signin(self, request):
-        form = await request.post()
-        if (
-            form["__RequestVerificationToken"] != "tok-123"
-            or form["Username"] != "guardian"
-            or form["Password"] != "secret"
-        ):
-            return web.Response(text="form again")
-        self.logins += 1
-        sid = f"s{self.logins}"
-        self.valid_sessions.add(sid)
-        resp = web.Response(status=302, headers={"Location": "/auth/process"})
-        resp.set_cookie("sid", sid)
-        # Vklass clears cookies like this on sign-in; naive jars keep them.
-        resp.headers.add(
-            "Set-Cookie", "stale=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"
+    async def serve_feed(self, request):
+        self.requests.append(request.headers.get("Accept"))
+        return web.Response(
+            text=self.feed, status=self.feed_status, content_type="text/calendar"
         )
-        return resp
 
-    async def process(self, request):
-        # The real /process answers 403 when a cleared cookie is sent back.
-        if "stale" in request.cookies:
-            return web.Response(status=403)
-        return web.Response(status=302, headers={"Location": "/c/landing"})
-
-    async def landing(self, request):
-        return web.Response(text="welcome")
-
-    def _authed(self, request):
-        return request.cookies.get("sid") in self.valid_sessions
-
-    def _expired(self):
-        return web.Response(status=302, headers={"Location": "/auth/credentials"})
-
-    async def schedule(self, request):
-        if not self._authed(request):
-            return self._expired()
-        return web.Response(text=(FIXTURES / "schedule.html").read_text())
-
-    async def welcome(self, request):
-        if not self._authed(request):
-            return self._expired()
-        return web.Response(text=(FIXTURES / "welcome.html").read_text())
-
-    async def calendar(self, request):
-        if not self._authed(request):
-            return self._expired()
-        self.calendar_posts.append(dict(await request.post()))
-        return web.Response(text=self.calendar_body, content_type="application/json")
+    async def serve_lunch(self, request):
+        return web.Response(text=self.lunch, status=self.lunch_status)
 
 
 @pytest.fixture
-async def env(aiohttp_server):
-    fake = FakeVklass()
-    server = await aiohttp_server(fake.app())
-    base = f"http://{server.host}:{server.port}"
-    async with aiohttp.ClientSession(
-        cookie_jar=aiohttp.CookieJar(unsafe=True)
-    ) as session:
-
-        def make(password="secret"):
-            return VklassClient(
-                session,
-                "guardian",
-                password,
-                auth_url=f"{base}/auth",
-                base_url=f"{base}/c",
-            )
-
-        yield fake, make
+async def fake(aiohttp_client):
+    f = Fake()
+    http = await aiohttp_client(f.app())
+    f.session = http.session
+    f.feed_url = str(http.make_url("/feed"))
+    f.lunch_url = str(http.make_url("/lunch"))
+    return f
 
 
-async def test_bad_credentials(env):
-    _, make = env
+def client(fake, lunch=False):
+    return VklassClient(
+        fake.session,
+        fake.feed_url,
+        lunch_url=fake.lunch_url if lunch else None,
+    )
+
+
+async def test_get_events(fake):
+    events = await client(fake).get_events(KID)
+    assert len(events) == 8
+    assert {e.child_id for e in events} == {"kid"}
+    assert fake.requests == ["text/calendar"]
+
+
+async def test_unknown_link_answers_empty_200(fake):
+    fake.feed = ""
     with pytest.raises(VklassAuthError):
-        await make("wrong").login()
+        await client(fake).get_events(KID)
 
 
-async def test_lazy_login_and_children(env):
-    fake, make = env
-    client = make()
-    assert fake.logins == 0
-    assert await client.get_children() == [ALVA, Child(1002, "Bo")]
-    assert fake.logins == 1
-
-
-async def test_events_request_and_result(env):
-    fake, make = env
-    events = await make().get_upcoming_events(ALVA, days=7, today=date(2026, 10, 19))
-    assert len(events) == 5
-    assert fake.calendar_posts == [
-        {
-            "students": "1001",
-            "start": "2026-10-19T00:00:00",
-            "end": "2026-10-26T00:00:00",
-        }
-    ]
-
-
-async def test_lunches_per_child(env):
-    _, make = env
-    children = [ALVA, Child(1002, "Bo"), Child(1003, "Nobody")]
-    lunches = await make().get_lunches(children, today=date(2026, 10, 22))
-    assert [(l.date, l.dishes) for l in lunches[1001]] == [
-        (date(2026, 10, 22), ["Köttbullar med potatis", "Vegetariskt: Linsgryta"]),
-        (date(2026, 10, 23), ["Fiskgratäng"]),
-        (date(2026, 10, 27), ["Pannkakor & sylt"]),
-    ]
-    assert [(l.date, l.dishes) for l in lunches[1002]] == [
-        (date(2026, 10, 22), ["Köttbullar med potatis"])
-    ]
-    assert lunches[1003] == []
-
-
-async def test_relogin_when_session_expires(env):
-    fake, make = env
-    client = make()
-    await client.get_children()
-    fake.valid_sessions.clear()  # server forgets us
-    assert await client.get_children()
-    assert fake.logins == 2
-
-
-async def test_session_rejected_after_relogin(env):
-    fake, make = env
-    client = make()
-    await client.get_children()
-    fake._authed = lambda request: False  # server never accepts our cookie
+async def test_404_means_link_not_recognised(fake):
+    fake.feed_status = 404
     with pytest.raises(VklassAuthError):
-        await client.get_children()
-    assert fake.logins == 2  # logged in once more, then gave up
+        await client(fake).get_events(KID)
 
 
-async def test_non_json_calendar(env):
-    fake, make = env
-    fake.calendar_body = "<html>oops</html>"
-    with pytest.raises(VklassParseError):
-        await make().get_events(ALVA, *_range())
+async def test_bot_protection_is_a_connection_error_not_an_auth_error(fake):
+    fake.feed_status = 403
+    with pytest.raises(VklassConnectionError):
+        await client(fake).get_events(KID)
+    fake.feed_status = 200
+    fake.feed = "<html><title>Verifying...</title></html>"
+    with pytest.raises(VklassConnectionError):
+        await client(fake).get_events(KID)
 
 
-async def test_connection_error():
+async def test_server_error(fake):
+    fake.feed_status = 500
+    with pytest.raises(VklassConnectionError):
+        await client(fake).get_events(KID)
+
+
+async def test_unreachable():
     async with aiohttp.ClientSession() as session:
-        client = VklassClient(
-            session, "u", "p", auth_url="http://127.0.0.1:1", base_url="http://127.0.0.1:1"
-        )
+        c = VklassClient(session, "http://127.0.0.1:1/feed")
         with pytest.raises(VklassConnectionError):
-            await client.login()
+            await c.get_events(KID)
 
 
-def _range():
-    from datetime import datetime
+async def test_lunches(fake):
+    lunches = await client(fake, lunch=True).get_lunches()
+    assert [l.date.isoformat() for l in lunches] == ["2026-11-02", "2026-11-03"]
 
-    return datetime(2026, 10, 19), datetime(2026, 10, 26)
+
+async def test_no_lunch_link_means_no_lunches(fake):
+    assert await client(fake).get_lunches() == []
+
+
+async def test_lunch_errors_are_vklass_errors(fake):
+    fake.lunch_status = 404
+    with pytest.raises(VklassError):
+        await client(fake, lunch=True).get_lunches()
+    fake.lunch_status = 200
+    fake.lunch = "<html>oops</html>"
+    with pytest.raises(VklassParseError):
+        await client(fake, lunch=True).get_lunches()

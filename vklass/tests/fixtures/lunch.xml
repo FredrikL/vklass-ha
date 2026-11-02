@@ -1,0 +1,26 @@
+
+              <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+                  <channel>
+                  <atom:link href="https://skolmaten.se/exampleskolan" rel="self" type="application/rss+xml" />
+                      <title>Skolmaten - Exempelskolan</title>
+                      <language>en</language>
+              <item>
+                  <title>Monday - Week 45</title>
+                  <description><![CDATA[Korv stroganoff serveras med ris (Bird), <br/>Vegetarisk korv stroganoff serveras med ris (Vegetarian)]]></description>
+                  <guid isPermaLink="false">1</guid>
+                  <pubDate>Mon, 02 Nov 2026 00:00:00 GMT</pubDate>
+               </item>
+              <item>
+                  <title>Tuesday - Week 45</title>
+                  <description><![CDATA[Spaghetti med färssås (Vegetarian)]]></description>
+                  <guid isPermaLink="false">2</guid>
+                  <pubDate>Tue, 03 Nov 2026 00:00:00 GMT</pubDate>
+               </item>
+              <item>
+                  <title>Wednesday - Week 45</title>
+                  <description><![CDATA[]]></description>
+                  <guid isPermaLink="false">3</guid>
+                  <pubDate>Wed, 04 Nov 2026 00:00:00 GMT</pubDate>
+               </item>
+                  </channel>
+              </rss>

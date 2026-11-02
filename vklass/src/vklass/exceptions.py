@@ -10,8 +10,12 @@ class VklassConnectionError(VklassError):
 
 
 class VklassAuthError(VklassError):
-    """Login was rejected, or a session could not be (re)established."""
+    """The server does not recognise the calendar link (revoked or mistyped)."""
 
 
 class VklassParseError(VklassError):
     """A response did not have the shape we expect (Vklass probably changed)."""
+
+
+class VklassInvalidUrl(VklassError, ValueError):
+    """A pasted link is not a Vklass calendar or Skolmaten menu link."""
