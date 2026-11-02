@@ -24,6 +24,14 @@ from .vklass_api import (
 )
 
 
+# Examples shown in the forms and error messages (hassfest does not allow URLs in
+# strings.json itself).
+EXAMPLES = {
+    "feed_example": "https://cal.vklass.se/<id>.ics",
+    "lunch_example": "https://skolmaten.se/<school>",
+}
+
+
 class VklassConfigFlow(ConfigFlow, domain=DOMAIN):
     # Version 1 used a username and password; see async_migrate_entry.
     VERSION = 2
@@ -97,6 +105,7 @@ class VklassConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): str,
                 }
             ),
+            description_placeholders=EXAMPLES,
             errors=errors,
         )
 
@@ -127,6 +136,6 @@ class VklassConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema({vol.Required(CONF_URL): str}),
-            description_placeholders={"name": entry.data[CONF_NAME]},
+            description_placeholders={**EXAMPLES, "name": entry.data[CONF_NAME]},
             errors=errors,
         )

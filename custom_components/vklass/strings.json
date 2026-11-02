@@ -3,14 +3,14 @@
     "step": {
       "user": {
         "title": "Add a child's Vklass schedule",
-        "description": "In Vklass, open the schedule page, choose \"Prenumerera på schema\" and copy the link for the child. Paste it below. Repeat \"Add integration\" for each child.\n\nThe lunch link is optional: the school's page on skolmaten.se, for example `https://skolmaten.se/yourschool`.",
+        "description": "In Vklass, open the schedule page, choose \"Prenumerera på schema\" and copy the link for the child. Paste it below. Repeat \"Add integration\" for each child.\n\nThe lunch link is optional: the school's page on skolmaten.se, for example `{lunch_example}`.",
         "data": {
           "name": "Child's name",
           "url": "Vklass calendar link",
           "lunch_url": "Skolmaten lunch link (optional)"
         },
         "data_description": {
-          "url": "The link looks like https://cal.vklass.se/….ics (webcal:// links work too). Anyone with the link can see the schedule, so keep it private.",
+          "url": "The link looks like {feed_example}. webcal links work too. Anyone with the link can see the schedule, so keep it private.",
           "lunch_url": "Leave empty to skip lunch."
         }
       },
@@ -23,8 +23,8 @@
       }
     },
     "error": {
-      "invalid_url": "This is not a Vklass calendar link. It should start with https://cal.vklass.se/ or webcal://cal.vklass.se/",
-      "invalid_lunch_url": "This is not a skolmaten.se link, for example https://skolmaten.se/yourschool",
+      "invalid_url": "This is not a Vklass calendar link. It should look like {feed_example}",
+      "invalid_lunch_url": "This is not a skolmaten.se link, for example {lunch_example}",
       "name_required": "Enter the child's name",
       "unknown_link": "Vklass does not recognise this calendar link",
       "cannot_connect": "Could not read the calendar from Vklass",
